@@ -20,17 +20,20 @@ import uuid
 import numpy as np
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+from dotenv import load_dotenv
 from mlx_audio.tts.utils import load_model
 from mlx_audio.utils import load_audio
 from mlx_audio.audio_io import write as audio_write
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-BASE_DIR       = os.path.dirname(os.path.abspath(__file__))
-MODEL_ID       = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16"
-REF_AUDIO_PATH = os.path.join(BASE_DIR, "derik2.wav")
-REF_TEXT_FILE  = os.path.join(BASE_DIR, "derik.txt")
-OUTPUT_DIR     = os.path.join(BASE_DIR, "outputs")
-PORT           = 8765
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(dotenv_path=os.path.join(BASE_DIR, "..", ".env"))
+
+MODEL_ID       = os.environ["VOICE_CLONE_MODEL_ID"]
+REF_AUDIO_PATH = os.environ["VOICE_CLONE_REF_AUDIO"]
+REF_TEXT_FILE  = os.environ["VOICE_CLONE_REF_TEXT"]
+OUTPUT_DIR     = os.path.join(BASE_DIR, os.getenv("VOICE_CLONE_OUTPUT_DIR", "outputs"))
+PORT           = int(os.getenv("VOICE_CLONE_PORT", "8765"))
 
 # ── Load ref text ──────────────────────────────────────────────────────────────
 with open(REF_TEXT_FILE, "r") as f:

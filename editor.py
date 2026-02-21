@@ -46,13 +46,13 @@ load_dotenv()
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-STYLE_MODEL    = "gemini-3.1-pro-preview"
-SCRIPTER_MODEL = "gemini-3.1-pro-preview"
-TTS_MODEL      = "gemini-2.5-flash-preview-tts"
-EDITOR_MODEL   = "gemini-3.1-pro-preview"
-CAPTION_MODEL  = "gemini-2.5-pro"          # needs accurate word-level timestamps
-TTS_VOICE      = "Kore"
-CLONE_TTS_URL  = "http://localhost:8765/generate"   # local voice-clone server (server.py)
+STYLE_MODEL    = os.getenv("STYLE_MODEL",    "gemini-3.1-pro-preview")
+SCRIPTER_MODEL = os.getenv("SCRIPTER_MODEL", "gemini-3.1-pro-preview")
+TTS_MODEL      = os.getenv("TTS_MODEL",      "gemini-2.5-flash-preview-tts")
+EDITOR_MODEL   = os.getenv("EDITOR_MODEL",   "gemini-3.1-pro-preview")
+CAPTION_MODEL  = os.getenv("CAPTION_MODEL",  "gemini-2.5-pro")
+TTS_VOICE      = os.getenv("TTS_VOICE",      "Kore")
+CLONE_TTS_URL  = os.getenv("CLONE_TTS_URL",  "http://localhost:8765/generate")
 
 # ── Cost tracking ───────────────────────────────────────────────────────────────
 _MODEL_COSTS: dict[str, dict] = {
@@ -111,9 +111,10 @@ def _log_cost(fn_name: str, model: str, response) -> float:
     return total
 
 
-W, H          = 576, 1024
-OUTPUT_VIDEO  = "final_edit.mp4"
-NARRATION_WAV = "narration.wav"
+W             = int(os.getenv("VIDEO_WIDTH",  "576"))
+H             = int(os.getenv("VIDEO_HEIGHT", "1024"))
+OUTPUT_VIDEO  = os.getenv("OUTPUT_VIDEO",  "final_edit.mp4")
+NARRATION_WAV = os.getenv("NARRATION_WAV", "narration.wav")
 
 # ── Per-scene visual effects (appended to the -vf chain in render_scene) ───────
 EFFECTS: dict[str, str] = {
@@ -125,8 +126,8 @@ EFFECTS: dict[str, str] = {
 }
 
 # ── Caption constants ───────────────────────────────────────────────────────────
-WORDS_PER_CAP = 4
-YELLOW_CHANCE = 0.35
+WORDS_PER_CAP = int(os.getenv("WORDS_PER_CAP",   "4"))
+YELLOW_CHANCE = float(os.getenv("YELLOW_CHANCE", "0.35"))
 FONTS_DIR     = os.path.dirname(os.path.abspath(__file__))
 WHITE         = r"\c&HFFFFFF&"
 YELLOW        = r"\c&H00FFFF&"
