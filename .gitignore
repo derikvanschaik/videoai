@@ -1,0 +1,16 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment / secrets
+.env
+
+# macOS
+.DS_Store
+
+# Generated media
+*.mp4
+*.wav
+*.mp3

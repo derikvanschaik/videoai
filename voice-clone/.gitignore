@@ -1,0 +1,15 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Generated audio outputs
+outputs/
+
+# Reference audio/text (local only, not committed)
+*.wav
+*.txt
+
+# Environment / secrets
+.env
