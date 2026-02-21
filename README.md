@@ -4,6 +4,12 @@
 
 Give it some clips and a prompt like *"GRWM as a 9-5 software engineer"* and it writes the script, clones your voice, edits the footage, and burns styled captions. You end up with a post-ready video without touching a timeline.
 
+Here are some examples I created with my voice + raw clips:
+
+https://github.com/user-attachments/assets/d5430961-40c5-4010-bac3-63d20608b0d7
+
+https://github.com/user-attachments/assets/02723989-f3c0-417e-ba36-82b61bce2ccb
+
 ## How it works
 
 1. **Voice cloning** — captures your voice from a sample so narration sounds like you
