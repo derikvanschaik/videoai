@@ -21,12 +21,19 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Copy `.env` and fill in your Gemini API key (model names and other settings are pre-filled with defaults):
+Copy the example env file and fill in your values:
 
 ```bash
-cp .env .env.local  # or just edit .env directly
-# set GEMINI_API_KEY=your_key_here
+cp .env.example .env
 ```
+
+At minimum you need a Gemini API key — get one at [aistudio.google.com](https://aistudio.google.com):
+
+```
+GEMINI_API_KEY=your_key_here
+```
+
+> **Heads up:** the default models (`gemini-3.1-pro-preview`, `gemini-2.5-pro`) require a paid Google AI Studio plan. See `.env.example` for all configurable values.
 
 ### 2. Voice clone server
 
