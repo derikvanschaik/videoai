@@ -1,8 +1,62 @@
-import subprocess
 import os
+import subprocess
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+from pydantic import BaseModel
+
+load_dotenv()
+
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+class CaptionWord(BaseModel):
+    text:   str
+    font:   str
+    size:   int
+    x:      int
+    y:      int
+    anchor: int
+    color:  str
+
+class CaptionPlan(BaseModel):
+    words: list[CaptionWord]
 
 
-def build_caption():
+def ask_gemini(video: str, words: list[str]) -> CaptionPlan:
+    video_part = types.Part(
+        inline_data=types.Blob(data=open(video, "rb").read(), mime_type="video/mp4")
+    )
+
+    prompt = types.Part(text=f"""
+You are a motion graphics artist placing captions on a video.
+
+Words to place: {words}
+
+The coordinate space is 1080x1920. For each word decide:
+- font: choose from Manrope, Georgia, Impact, Arial, Helvetica
+- size: 80-200 depending on emphasis
+- x/y: position — keep x between 100-980 and y between 100-1820
+- anchor: numpad position (2=bottom-center, 5=center, 8=top-center)
+- color: ASS format e.g. \\c&HFFFFFF& for white
+
+Rules:
+- Never place text over a subject's face or important objects
+- All words must be placed somewhere visible
+- You can create  centered blocks, or straight line text with one word having a different font
+""")
+
+    response = client.models.generate_content(
+        model="gemini-3.1-pro-preview",
+        contents=types.Content(parts=[video_part, prompt]),
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=CaptionPlan,
+        ),
+    )
+    return CaptionPlan.model_validate_json(response.text)
+
+
+def build_caption(plan: CaptionPlan) -> str:
     header = """\
 [Script Info]
 ScriptType: v4.00+
@@ -16,18 +70,13 @@ Style: Default,Manrope,160,&H00FFFFFF,1,2
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
-    lines = [
-        ("Hello",   "Manrope", 160, 540, 800,  2),
-        ("World",   "Georgia", 120, 300, 1100, 8),
-        ("Whatsup", "Impact",  200, 700, 600,  5),
-    ]
     events = []
-
-    for l, font, size, x, y, anchor in lines:
-        text = rf"{{\an{anchor}\pos({x},{y})\fn{font}\fs{size}\b1\c&HFFFFFF&}}" + l
+    for w in plan.words:
+        text = rf"{{\an{w.anchor}\pos({w.x},{w.y})\fn{w.font}\fs{w.size}\b1{w.color}}}" + w.text
         events.append(f"Dialogue: 0,0:00:00.00,0:00:06.00,Default,,0,0,0,,{text}")
 
     return header + "\n".join(events) + "\n"
+
 
 def burn_captions(src: str, dst: str, ass_content: str) -> None:
     ass_tmp_path = src.replace(".mp4", "_captions.ass")
@@ -48,5 +97,7 @@ def burn_captions(src: str, dst: str, ass_content: str) -> None:
         os.unlink(ass_tmp_path)
 
 
-ass = build_caption()
+words = ["Hello", "World", "Whatsup"]
+plan  = ask_gemini('./videos/clip1.mp4', words)
+ass   = build_caption(plan)
 burn_captions('./videos/clip1.mp4', './caption-debug.mp4', ass)
