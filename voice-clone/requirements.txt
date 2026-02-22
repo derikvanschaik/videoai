@@ -1,0 +1,6 @@
+# Voice clone TTS microservice dependencies
+# Run in its own venv: python -m venv venv && ./venv/bin/pip install -r requirements.txt
+
+mlx-audio==0.3.1
+numpy==2.4.2
+python-dotenv==1.1.0
