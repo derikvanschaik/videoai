@@ -226,7 +226,7 @@ new video is.""")
 
 # ── Agent 1: Scripter ──────────────────────────────────────────────────────────
 
-def write_script(query: str, clips: dict[str, str], style_guide: StyleGuide | None = None) -> Script:
+def write_script(query: str, clips: dict[str, str], style_guide: StyleGuide | None = None, lang: str | None = None) -> Script:
     print(f"[Scripter] Watching {len(clips)} clip(s) and drafting script for: '{query}'")
 
     def load(path: str) -> types.Part:
@@ -280,6 +280,9 @@ Requirements:
 IMPORTANT: narration fields will be read aloud by a TTS voice. Write natural spoken sentences only — no brackets, no directions, just what the narrator says.
 
 visual_direction must reference specific things you actually saw in the clips (clip number, what was happening)."""))
+    
+    if lang is not None:
+        parts.append(types.Part(text=f"\n Please generate this in the following language: {lang}"))
 
     response = client.models.generate_content(
         model=SCRIPTER_MODEL,
@@ -295,9 +298,12 @@ visual_direction must reference specific things you actually saw in the clips (c
 
 # ── Agent 2: TTS (per segment) ─────────────────────────────────────────────────
 
-def _tts_one(text: str, out_path: str) -> float:
+def _tts_one(text: str, out_path: str, lang=None) -> float:
     """Synthesise a single text segment via the local voice-clone server, return duration in seconds."""
-    payload = json.dumps({"text": text}).encode()
+    payload_data = {"text": text}
+    if lang:
+        payload_data["lang_code"] = lang
+    payload = json.dumps(payload_data).encode()
     req     = urllib.request.Request(
         CLONE_TTS_URL,
         data=payload,
@@ -315,36 +321,6 @@ def _tts_one(text: str, out_path: str) -> float:
 
     return duration
 
-    # ── Gemini TTS (commented out) ────────────────────────────────────────────
-    # response = client.models.generate_content(
-    #     model=TTS_MODEL,
-    #     contents=text,
-    #     config=types.GenerateContentConfig(
-    #         response_modalities=["AUDIO"],
-    #         speech_config=types.SpeechConfig(
-    #             voice_config=types.VoiceConfig(
-    #                 prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=TTS_VOICE)
-    #             )
-    #         ),
-    #     ),
-    # )
-    # _log_cost("tts_one", TTS_MODEL, response)
-    # part      = response.candidates[0].content.parts[0]
-    # pcm_data  = part.inline_data.data
-    # mime_type = part.inline_data.mime_type
-    #
-    # sample_rate = 24000
-    # if "rate=" in mime_type:
-    #     sample_rate = int(mime_type.split("rate=")[1].split(";")[0].strip())
-    #
-    # with wave.open(out_path, "wb") as wav:
-    #     wav.setnchannels(1)
-    #     wav.setsampwidth(2)
-    #     wav.setframerate(sample_rate)
-    #     wav.writeframes(pcm_data)
-    #
-    # return len(pcm_data) / (sample_rate * 2)
-
 
 def _concat_wavs(paths: list[str], out_path: str):
     with wave.open(out_path, "wb") as out_wav:
@@ -355,7 +331,7 @@ def _concat_wavs(paths: list[str], out_path: str):
                 out_wav.writeframes(src.readframes(src.getnframes()))
 
 
-def generate_narration(script: Script) -> tuple[str, dict[int, float]]:
+def generate_narration(script: Script, lang=None) -> tuple[str, dict[int, float]]:
     """
     Generate TTS for every segment (hook + beats + cta) individually.
 
@@ -377,7 +353,7 @@ def generate_narration(script: Script) -> tuple[str, dict[int, float]]:
         for seg_idx, label, text in segments:
             seg_path = os.path.join(tmp, f"seg_{seg_idx:03d}.wav")
             print(f"[TTS] Segment {label}: \"{text[:60]}{'…' if len(text)>60 else ''}\"")
-            dur = _tts_one(text, seg_path)
+            dur = _tts_one(text, seg_path, lang=lang)
             durations[seg_idx] = dur
             wav_paths.append(seg_path)
             print(f"       → {dur:.2f}s")
@@ -781,6 +757,7 @@ def main():
     )
     parser.add_argument("query",  help="Topic / creative direction for the video")
     parser.add_argument("--ref",  metavar="REF_VIDEO", help="Reference video to match style")
+    parser.add_argument("--lang",  metavar="LANG_CODE", help="Language to create the video in")
     parser.add_argument("clips",  nargs="*", help="Source clip(s) to edit from")
     args = parser.parse_args()
 
@@ -810,7 +787,7 @@ def main():
         print(f"{'─'*50}\n")
 
     # ── 1. Script ──
-    script = write_script(args.query, clips, style_guide)
+    script = write_script(args.query, clips, style_guide, lang=args.lang or "en")
     print(f"\n{'─'*50}")
     print(f"SCRIPT: {script.topic}")
     print(f"Hook : {script.hook}")
@@ -822,7 +799,7 @@ def main():
     print(f"{'─'*50}\n")
 
     # ── 2. TTS ──
-    narration_wav, durations = generate_narration(script)
+    narration_wav, durations = generate_narration(script, lang=args.lang or "en")
 
     cta_idx = max(durations.keys())
     print(f"\nSegment durations:")

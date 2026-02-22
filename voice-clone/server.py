@@ -63,6 +63,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         text = (data.get("text") or "").strip()
+        lang_code = (data.get("lang_code") or "en").strip()
         if not text:
             self._send(400, {"error": "missing or empty 'text' field"})
             return
@@ -77,7 +78,7 @@ class Handler(BaseHTTPRequestHandler):
                 text=text,
                 voice=None,
                 speed=1.0,
-                lang_code="en",
+                lang_code=lang_code,
                 ref_audio=REF_AUDIO,
                 ref_text=REF_TEXT,
                 temperature=0.7,
