@@ -22,13 +22,24 @@ class CaptionPlan(BaseModel):
     words: list[CaptionWord]
 
 
-def ask_gemini(video: str, words: list[str]) -> CaptionPlan:
-    video_part = types.Part(
-        inline_data=types.Blob(data=open(video, "rb").read(), mime_type="video/mp4")
-    )
+def ask_gemini(video: str, words: list[str], ref_video: str | None = None) -> CaptionPlan:
+    parts = []
 
-    prompt = types.Part(text=f"""
+    if ref_video:
+        parts.append(types.Part(text="REFERENCE VIDEO (match this caption style):"))
+        parts.append(types.Part(
+            inline_data=types.Blob(data=open(ref_video, "rb").read(), mime_type="video/mp4")
+        ))
+
+    parts.append(types.Part(text="TARGET VIDEO (place captions on this):"))
+    parts.append(types.Part(
+        inline_data=types.Blob(data=open(video, "rb").read(), mime_type="video/mp4")
+    ))
+
+    parts.append(types.Part(text=f"""
 You are a motion graphics artist placing captions on a video.
+
+{"Study the reference video's caption style — font choices, sizes, positioning, color — and match it on the target video." if ref_video else ""}
 
 Words to place: {words}
 
@@ -39,15 +50,11 @@ The coordinate space is 1080x1920. For each word decide:
 - anchor: numpad position (2=bottom-center, 5=center, 8=top-center)
 - color: ASS format e.g. \\c&HFFFFFF& for white
 
-Rules:
-- Never place text over a subject's face or important objects
-- All words must be placed somewhere visible
-- You can create  centered blocks, or straight line text with one word having a different font
-""")
+"""))
 
     response = client.models.generate_content(
         model="gemini-3.1-pro-preview",
-        contents=types.Content(parts=[video_part, prompt]),
+        contents=types.Content(parts=parts),
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=CaptionPlan,
@@ -97,7 +104,9 @@ def burn_captions(src: str, dst: str, ass_content: str) -> None:
         os.unlink(ass_tmp_path)
 
 
-words = ["Hello", "World", "Whatsup"]
-plan  = ask_gemini('./videos/clip1.mp4', words)
+# typing issue here lol
+words = [word for word in "Here is how I built my startup at 16 with no help from my parents".split(" ") ]
+
+plan  = ask_gemini('./videos/clip1.mp4', words, ref_video='ref2.mp4')
 ass   = build_caption(plan)
 burn_captions('./videos/clip1.mp4', './caption-debug.mp4', ass)
