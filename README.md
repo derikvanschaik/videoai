@@ -91,6 +91,16 @@ python3 editor.py "grwm as an indie software engineer working remote" --ref ref.
 
 `--ref` is optional. Pass it a video whose editing style you want to emulate — pacing, energy, color grade, mood — and the pipeline will analyze it and match that style in the output. Leave it out and the editor will make its own creative decisions.
 
+`--lang` is optional. Pass a BCP-47 language code to generate the script and narration in a different language:
+
+```bash
+python3 editor.py "grwm as an indie software engineer working remote" --lang es videos/*.mp4
+```
+
+Common codes: `es` (Spanish), `fr` (French), `de` (German), `ja` (Japanese), `pt` (Portuguese).
+
+> **Note:** multilingual quality depends on your voice clone model. The default 0.6B model may sound unnatural for non-English languages — switching to a larger model like `mlx-community/Qwen3-TTS-4B-Instruct-bf16` in your `.env` will give better results.
+
 ## Examples
 
 - [Example 1](https://github.com/dslogs/videoai/issues/1)
