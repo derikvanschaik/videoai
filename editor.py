@@ -126,11 +126,9 @@ EFFECTS: dict[str, str] = {
 }
 
 # ── Caption constants ───────────────────────────────────────────────────────────
-WORDS_PER_CAP = int(os.getenv("WORDS_PER_CAP",   "4"))
-YELLOW_CHANCE = float(os.getenv("YELLOW_CHANCE", "0.35"))
-FONTS_DIR     = os.path.dirname(os.path.abspath(__file__))
-WHITE         = r"\c&HFFFFFF&"
-YELLOW        = r"\c&H00FFFF&"
+WORDS_PER_CAP    = int(os.getenv("WORDS_PER_CAP",    "4"))
+ALT_COLOR_CHANCE = float(os.getenv("ALT_COLOR_CHANCE", "0.35"))
+FONTS_DIR        = os.path.dirname(os.path.abspath(__file__))
 
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
@@ -176,6 +174,8 @@ class SegmentCaption(BaseModel):
     y:      int    # vertical anchor in PlayRes space (0-1920)
     anchor: int    # ASS \an value — 2 = bottom-center (text grows up from y), 8 = top-center (text grows down from y)
     scale:  float  # font scale multiplier: 1.0 = normal, 0.75 = smaller for busy frames
+    primary_color: str     #  r"\c&HFFFFFF&" something like this
+    alt_color: str #  r"\c&HFFFFFF&" something like this
 
 class CaptionAnalysis(BaseModel):
     """Single-call result: word-level transcription + precise per-segment caption placement."""
@@ -608,6 +608,14 @@ Fields to return per segment:
 
   scale   — 1.0 = normal. Use 0.75 if the frame is very busy and captions would crowd the shot.
 
+  primary_color   - The main caption color. Format: \c&HBBGGRR& where BB, GG, RR are two-digit hex values
+                    for blue, green, and red channels respectively. Choose a color visible against the scene.
+
+  alt_color       - A second accent color for emphasis words. Same format: \c&HBBGGRR&.
+                    Should contrast or complement primary_color.
+
+            
+
 PLACEMENT STRATEGY (think like a motion graphics artist):
 - Subject standing center-frame         → captions at top center (anchor=8, y=480)
 - Subject in lower frame (walking etc.) → captions in upper third (anchor=8, y=420)
@@ -629,7 +637,7 @@ Return one SegmentCaption per segment and the full word list.
     result = CaptionAnalysis.model_validate_json(response.text)
     print(f"  {len(result.words)} words transcribed")
     for sc in sorted(result.segments, key=lambda s: s.segment_index):
-        print(f"  seg {sc.segment_index}: pos=({sc.x},{sc.y}) anchor=\\an{sc.anchor} scale={sc.scale}")
+        print(f"  seg {sc.segment_index}: pos=({sc.x},{sc.y}) anchor=\\an{sc.anchor} scale={sc.scale} primary={sc.primary_color!r} alt={sc.alt_color!r}")
     return result
 
 
@@ -640,7 +648,7 @@ def _to_ass_time(s: float) -> str:
     return f"{h}:{m:02d}:{s:05.2f}"
 
 
-def _build_lines(chunk: list[Word]) -> list[tuple[str, float]]:
+def _build_lines(chunk: list[Word], primary_color: str, alt_color: str) -> list[tuple[str, float]]:
     """Returns list of (line_text, start_time) pairs using real word timestamps."""
     lines, sm_buf, sm_start = [], [], None
     for w in chunk:
@@ -650,14 +658,14 @@ def _build_lines(chunk: list[Word]) -> list[tuple[str, float]]:
             sm_buf.append(w.text.upper())
         else:
             if sm_buf:
-                lines.append((r"{\fnManrope\fs44\b0\fsp10\c&HFFFFFF&}" + "  ".join(sm_buf), sm_start))
+                lines.append((rf"{{\fnManrope\fs44\b0\fsp10{primary_color}}}" + "  ".join(sm_buf), sm_start))
                 sm_buf, sm_start = [], None
-            color = YELLOW if random.random() < YELLOW_CHANCE else WHITE
+            color = alt_color if random.random() < ALT_COLOR_CHANCE else primary_color
             lines.append((rf"{{\fnManrope\fs160\b1\fsp0{color}}}" + w.text.lower(), w.start))
     if sm_buf:
-        lines.append((r"{\fnManrope\fs44\b0\fsp10\c&HFFFFFF&}" + "  ".join(sm_buf), sm_start))
+        lines.append((rf"{{\fnManrope\fs44\b0\fsp10{primary_color}}}" + "  ".join(sm_buf), sm_start))
     if not lines:
-        lines = [(r"{\fnManrope\fs160\b1\c&HFFFFFF&}" + chunk[0].text.lower(), chunk[0].start)]
+        lines = [(rf"{{\fnManrope\fs160\b1{primary_color}}}" + chunk[0].text.lower(), chunk[0].start)]
     return lines
 
 
@@ -715,7 +723,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         else:
             pos_tag = r"\an2\pos(540,1820)"  # safe default: bottom-center
 
-        lines = _build_lines(chunk)
+        primary_color = sc.primary_color if sc else r"\c&HFFFFFF&"
+        alt_color     = sc.alt_color     if sc else r"\c&H00FFFF&"
+        lines = _build_lines(chunk, primary_color, alt_color)
         for j in range(len(lines)):
             t0   = lines[j][1]
             t1   = lines[j + 1][1] if j < len(lines) - 1 else chunk_end
