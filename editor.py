@@ -167,6 +167,7 @@ class Word(BaseModel):
     start:    float
     end:      float
     emphasis: bool
+    font: str
 
 class SegmentCaption(BaseModel):
     segment_index: int
@@ -576,7 +577,8 @@ def analyze_captions(
 ━━ TASK 1 — TRANSCRIPTION ━━
 Transcribe every spoken word with accurate timestamps.
 For each word, set emphasis=true if it carries meaning (nouns, verbs, adjectives, names,
-numbers, key phrases) or emphasis=false for filler/function words (a, the, is, and, to, of, etc.).
+numbers, key phrases) or emphasis=false for filler/function words (a, the, is, and, to, of, etc.)
+Choose a font for the word: Our default font is Manrope, but mix it up with other fonts native to ffmpeg.
 
 ━━ TASK 2 — CAPTION PLACEMENT ━━
 The video has {len(scenes)} segments at these time ranges:
@@ -649,7 +651,6 @@ def _to_ass_time(s: float) -> str:
 
 
 def _build_lines(chunk: list[Word], primary_color: str, alt_color: str) -> list[tuple[str, float]]:
-    """Returns list of (line_text, start_time) pairs using real word timestamps."""
     lines, sm_buf, sm_start = [], [], None
     for w in chunk:
         if not w.emphasis:
@@ -658,14 +659,14 @@ def _build_lines(chunk: list[Word], primary_color: str, alt_color: str) -> list[
             sm_buf.append(w.text.upper())
         else:
             if sm_buf:
-                lines.append((rf"{{\fnManrope\fs44\b0\fsp10{primary_color}}}" + "  ".join(sm_buf), sm_start))
+                lines.append((rf"{{\fn{w.font}\fs44\b0\fsp10{primary_color}}}" + "  ".join(sm_buf), sm_start))
                 sm_buf, sm_start = [], None
             color = alt_color if random.random() < ALT_COLOR_CHANCE else primary_color
-            lines.append((rf"{{\fnManrope\fs160\b1\fsp0{color}}}" + w.text.lower(), w.start))
+            lines.append((rf"{{\fn{w.font}\fs160\b1\fsp0{color}}}" + w.text.lower(), w.start))
     if sm_buf:
-        lines.append((rf"{{\fnManrope\fs44\b0\fsp10{primary_color}}}" + "  ".join(sm_buf), sm_start))
+        lines.append((rf"{{\fn{w.font}\fs44\b0\fsp10{primary_color}}}" + "  ".join(sm_buf), sm_start))
     if not lines:
-        lines = [(rf"{{\fnManrope\fs160\b1{primary_color}}}" + chunk[0].text.lower(), chunk[0].start)]
+        lines = [(rf"{{\fn{w.font}\fs160\b1{primary_color}}}" + chunk[0].text.lower(), chunk[0].start)]
     return lines
 
 
@@ -850,6 +851,9 @@ def main():
     # ── 5. Captions ──
     print(f"\n{'─'*50}")
     caption_analysis = analyze_captions(OUTPUT_VIDEO, scenes, durations)
+    
+    print(caption_analysis)
+
     ass = build_ass(caption_analysis, durations)
     print("[Captions] Burning captions...")
     burn_captions(OUTPUT_VIDEO, ass)
