@@ -26,7 +26,10 @@ POSITIONS = {
 }
 
 
-def build_caption_ass(text_effect="append_new_line", position="upper_center") -> str:
+def build_caption_ass(lines) -> str:
+    """
+    lines: List of (words, t0, t1) where t0 and t2 "0:00:00.00", "0:00:01.00"
+    """
     header = """\
 [Script Info]
 ScriptType: v4.00+
@@ -41,35 +44,37 @@ Style: Default,Manrope,160,&H00FFFFFF,1,2
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
-    # (word, style_tag, t0, t1)
-    words = [
-        ("GRWM", rf"{{\fnManrope\fs110\b1\i1\c&H00FFFFFF&}}", "0:00:00.00", "0:00:01.00"),
-        ("day",  rf"{{\fnManrope\fs110\b1\i1\c&H00FFFFFF&}}", "0:00:01.00", "0:00:02.00"),
-        ("in",   rf"{{\fnManrope\fs110\b1\i1\c&H00FFFFFF&}}", "0:00:02.00", "0:00:03.00"),
-        ("the",  rf"{{\fnManrope\fs110\b1\i1\c&H00FFFFFF&}}", "0:00:03.00", "0:00:04.00"),
-        ("life", rf"{{\fnManrope\fs110\b1\i1\c&H00FFFFFF&}}", "0:00:04.00", "0:00:06.00"),
-        ("of a 9-5 engineer who just did it for the love of the game OG yeee bruh yeeyeyeye", rf"{{\fnManrope\fs110\b1\i1\c&H00FFFFFF&}}", "0:00:06.00", "0:00:09.00"),
+    # (word, t0, t1) # "0:00:00.00", "0:00:01.00"
+    font = "Manrope"
+    font_size = 110
+    bold = True
+    color = "00FFFFFF"  # white (BGR format, no H prefix)
+
+    text_styles = (
+        r"{\fn" + font +
+        r"\fs" + str(font_size) +
+        r"\b" + ("1" if bold else "0") +
+        r"\i0" + # italic 
+        r"\c&H" + color + r"&}"
+    )
+    # Result: {\fnManrope\fs160\b1\i0\c&H00FFFFFF&}
+
+    lines = [
+        (l[0], text_styles, l[1], l[2])
+        for l in lines
     ]
     events = []
 
+    position = "upper_center"
     an, ml, mr, mv = POSITIONS[position]
     pos_tag = "{" + an + "}"
     margins = f"{ml},{mr},{mv}"
 
-    if text_effect == "all_at_once":
-        text = pos_tag + " ".join(style + word for word, style, _, _ in words)
-        events.append(f"Dialogue: 0,{words[0][2]},{words[-1][3]},Default,,{margins},,{text}")
-
-    elif text_effect == "replace":
-        for word, style, t0, t1 in words:
-            text = pos_tag + style + word
-            events.append(f"Dialogue: 0,{t0},{t1},Default,,{margins},,{text}")
-
-    else:  # append_new_line
-        for j in range(len(words)):
-            _, _, t0, t1 = words[j]
-            text = pos_tag + r"\N".join(style + word for word, style, _, _ in words[:j + 1])
-            events.append(f"Dialogue: 0,{t0},{t1},Default,,{margins},,{text}")
+    # This creates that text on different lines effect
+    for j in range(len(lines)):
+        _, _, t0, t1 = lines[j]
+        text = pos_tag + r"\N".join(style + word for word, style, _, _ in lines[:j + 1])
+        events.append(f"Dialogue: 0,{t0},{t1},Default,,{margins},,{text}")
 
     return header + "\n".join(events) + "\n"
 
@@ -95,5 +100,11 @@ def burn_captions_from_ass(src: str, dst: str, ass_content: str) -> None:
 
 position = random.choice(list(POSITIONS.keys()))
 print(f"Using position: {position}")
-ass = build_caption_ass(text_effect="replace", position="upper_center")
+ass = build_caption_ass(
+    [
+        ("10 programming languages", "0:00:00.00", "0:00:01.00"),
+        ("you need to know ", "0:00:01.00", "0:00:03.00"),
+        ("by 2026", "0:00:03.00", "0:00:05.00"), 
+     ]
+    )
 burn_captions_from_ass('./videos/clip1.mp4', './caption-debug.mp4', ass)
