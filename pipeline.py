@@ -1,9 +1,11 @@
 import os
 import subprocess
 import tempfile
+import json
 
 from agents.editor import create_edit_plan
 from tools.clip import clip
+from tools.cap import build_caption_ass, burn_captions_from_ass, Caption
 
 ROOT_PATH = '/Users/projectcoordinator/Desktop/videoai/videos'
 OUTPUT    = 'test.mp4'
@@ -44,4 +46,35 @@ with tempfile.TemporaryDirectory() as tmp:
     ], check=True, capture_output=True)
     os.unlink(list_file)
 
-print(f"\nDone → {OUTPUT}")
+
+# HELPERS FOR CAPTION STEP
+def parse_mm_ss_string_to_seconds(mm_ss: str) -> int:
+    mm, ss = mm_ss.split(":")[0], mm_ss.split(":")[1]
+    mm = int(mm) * 60
+    ss = int(ss)
+    return int(mm + ss)
+
+def seconds_to_mm_ss(seconds: int) -> str:
+      mm = seconds // 60
+      ss = seconds % 60                                                                                              
+      return f"{mm:02d}:{ss:02d}"
+
+
+# Now Add captions after video is clipped together
+captions = []
+time_in_final_video = 0
+for scene in sorted(plan.scenes, key=lambda s: s.index):
+    duration = parse_mm_ss_string_to_seconds(scene.clip_end) - parse_mm_ss_string_to_seconds(scene.clip_start)
+    start = time_in_final_video
+    end   = time_in_final_video + duration
+    time_in_final_video += duration
+    captions.append(Caption(
+        text  = scene.narration,
+        start = seconds_to_mm_ss(start),
+        end   = seconds_to_mm_ss(end),
+    ))
+
+caption_ass = build_caption_ass(captions)
+burn_captions_from_ass(OUTPUT, 'final_output.mp4', caption_ass)
+
+# print(f"\nDone → {OUTPUT}")
