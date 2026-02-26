@@ -1,7 +1,6 @@
 """
-Editor agent — single prompt → structured EditPlan.
+Editor agent — clips + query → EditPlan.
 """
-
 from __future__ import annotations
 
 import os
@@ -16,49 +15,63 @@ load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 MODEL  = os.getenv("EDITOR_MODEL", "gemini-3.1-pro-preview")
 
-CLIPS = {
-    "reference_video" :  "/Users/projectcoordinator/Desktop/reference.mov",
-    "0": "/Users/projectcoordinator/Desktop/neymar.mov",
-}
+
+# ── Schema ───────────────────────────────────────────────────────────────────────
+
+class Scene(BaseModel):
+    index:      int
+    clip_key:   str
+    clip_start: str    # MM:SS
+    duration:   float  # seconds
+    narration:  str    # spoken words for this scene
+
+class EditPlan(BaseModel):
+    scenes: list[Scene]
 
 
-# ── Agent ──────────────────────────────────────────────────────────────────────
+# ── Agent ────────────────────────────────────────────────────────────────────────
 
-parts: list[types.Part] = []
+def create_edit_plan(query: str, clip_paths: list[str]) -> EditPlan:
+    parts: list[types.Part] = []
 
-for key, path in CLIPS.items():
-    parts.append(types.Part(text=f"CLIP {key} ({os.path.basename(path)}):"))
-    parts.append(types.Part(
-        inline_data=types.Blob(data=open(path, "rb").read(), mime_type="video/mov")
-    ))
+    for i, path in enumerate(clip_paths):
+        ext  = os.path.splitext(path)[1].lower()
+        mime = "video/quicktime" if ext == ".mov" else "video/mp4"
+        parts.append(types.Part(text=f"CLIP {i} ({os.path.basename(path)}):"))
+        parts.append(types.Part(inline_data=types.Blob(data=open(path, "rb").read(), mime_type=mime)))
 
-print(parts)
+    parts.append(types.Part(text=f"""You are a video editor making a short-form viral video (TikTok / Reels).
 
-parts.append(types.Part(text=f"""You are a professional video editor.
+General Video Direction/Topic: {query}
+Clips: {list(range(len(clip_paths)))}
 
-Watch the video and create an edit plan
-so that the clip '0' follows the editing style as the video: 'reference_video'.
-of the clip, the script must use actual events occurring in the video. 
-
-
-You should aim to have some effects to make this visually interesting 
-and go viral on a platform like Youtube Shorts or TikTok
-
-For each scene return:
-- clip_key   — which clip (one of: {sorted(CLIPS.keys())})
-- clip_start — best timestamp in MM:SS
-- duration   — how many seconds this scene runs
-- effect     — An effect to have (sped up, filter, grainy, blurry, etc... or none)
-- index      - order to display it in the final edit
-- transition - Transition effect
-- caption    - caption to add if necessary. 
+Watch the clips and return an edit plan. For each scene pick:
+- clip_key   — which clip (index as string)
+- clip_start — best timestamp MM:SS
+- duration   — how long to hold the shot (seconds)
+- narration  — what the voiceover says over this scene
 
 Keep total runtime under 90 seconds.
 """))
 
-response = client.models.generate_content(
-    model=MODEL,
-    contents=types.Content(parts=parts),
-)
+    response = client.models.generate_content(
+        model=MODEL,
+        contents=types.Content(parts=parts),
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=EditPlan,
+        ),
+    )
 
-print(response.text)
+    return EditPlan.model_validate_json(response.text)
+
+
+# example usage
+if __name__ == "__main__":
+    ROOT_PATH = '/Users/projectcoordinator/Desktop/videoai/videos'
+    clips = []
+    for i in range(1, 9):
+        clips.append(ROOT_PATH + '/clip' + str(i) + '.mp4')
+
+    edit_plan = create_edit_plan('5 simple beginner programming projects', clips)
+    print(edit_plan)
