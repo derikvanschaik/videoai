@@ -21,9 +21,9 @@ MODEL  = os.getenv("EDITOR_MODEL", "gemini-3.1-pro-preview")
 class Scene(BaseModel):
     index:      int
     clip_key:   str
-    clip_start: str    # MM:SS
-    duration:   float  # seconds
-    narration:  str    # spoken words for this scene
+    clip_start: str  # MM:SS
+    clip_end:   str  # MM:SS
+    narration:  str  # spoken words for this scene
 
 class EditPlan(BaseModel):
     scenes: list[Scene]
@@ -47,8 +47,8 @@ Clips: {list(range(len(clip_paths)))}
 
 Watch the clips and return an edit plan. For each scene pick:
 - clip_key   — which clip (index as string)
-- clip_start — best timestamp MM:SS
-- duration   — how long to hold the shot (seconds)
+- clip_start — start timestamp MM:SS
+- clip_end   — end timestamp MM:SS
 - narration  — what the voiceover says over this scene
 
 Keep total runtime under 90 seconds.

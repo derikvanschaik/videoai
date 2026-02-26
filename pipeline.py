@@ -12,15 +12,6 @@ QUERY     = '5 simple beginner programming projects'
 clips = [os.path.join(ROOT_PATH, f'clip{i}.mp4') for i in range(1, 9)]
 
 
-def mm_ss_to_sec(ts: str) -> float:
-    m, s = ts.strip().split(":")
-    return int(m) * 60 + float(s)
-
-def sec_to_mm_ss(s: float) -> str:
-    m = int(s) // 60
-    return f"{m:02d}:{s - m * 60:06.3f}"
-
-
 # ── 1. Get edit plan ─────────────────────────────────────────────────────────────
 
 plan = create_edit_plan(QUERY, clips)
@@ -31,13 +22,11 @@ with tempfile.TemporaryDirectory() as tmp:
     scene_paths = []
 
     for scene in sorted(plan.scenes, key=lambda s: s.index):
-        src   = clips[int(scene.clip_key)]
-        start = scene.clip_start
-        end   = sec_to_mm_ss(mm_ss_to_sec(start) + scene.duration)
-        dst   = os.path.join(tmp, f"scene_{scene.index:03d}.mp4")
+        src = clips[int(scene.clip_key)]
+        dst = os.path.join(tmp, f"scene_{scene.index:03d}.mp4")
 
-        print(f"[{scene.index}] {os.path.basename(src)}  {start} → {end}  ({scene.duration:.1f}s)")
-        clip(src, start, end, dst)
+        print(f"[{scene.index}] {os.path.basename(src)}  {scene.clip_start} → {scene.clip_end}")
+        clip(src, scene.clip_start, scene.clip_end, dst)
         scene_paths.append(dst)
 
     # ── 3. Concatenate into final video ──────────────────────────────────────────
