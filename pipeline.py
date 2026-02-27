@@ -5,6 +5,7 @@ import json
 
 from agents.editor import create_edit_plan
 from tools.clip import clip
+from tools.tts import tts
 from tools.cap import build_caption_ass, burn_captions_from_ass, Caption
 
 ROOT_PATH = '/Users/projectcoordinator/Desktop/videoai/videos'
@@ -77,4 +78,41 @@ for scene in sorted(plan.scenes, key=lambda s: s.index):
 caption_ass = build_caption_ass(captions)
 burn_captions_from_ass(OUTPUT, 'final_output.mp4', caption_ass)
 
-# print(f"\nDone → {OUTPUT}")
+# ── 5. TTS + mix narration ────────────────────────────────────────────────────────
+
+with tempfile.TemporaryDirectory() as tmp:
+    wav_paths = []
+    for scene in sorted(plan.scenes, key=lambda s: s.index):
+        dst = os.path.join(tmp, f"narration_{scene.index:03d}.wav")
+        print(f"[TTS] scene {scene.index}: {scene.narration[:60]}")
+        tts(scene.narration, dst)
+        wav_paths.append(dst)
+
+    # concat all wavs into one narration track
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        for path in wav_paths:
+            f.write(f"file '{path}'\n")
+        wav_list = f.name
+
+    narration_wav = "narration.wav"
+    subprocess.run([
+        "ffmpeg", "-y",
+        "-f", "concat", "-safe", "0", "-i", wav_list,
+        narration_wav,
+    ], check=True, capture_output=True)
+    os.unlink(wav_list)
+
+# mix narration onto the captioned video
+subprocess.run([
+    "ffmpeg", "-y",
+    "-i", "final_output.mp4",
+    "-i", narration_wav,
+    "-map", "0:v",
+    "-map", "1:a",
+    "-c:v", "copy",
+    "-c:a", "aac",
+    "-shortest",
+    "final_with_narration.mp4",
+], check=True, capture_output=True)
+
+print("\nDone → final_with_narration.mp4")
