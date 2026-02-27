@@ -5,6 +5,7 @@ import json
 
 from agents.editor import create_edit_plan
 from agents.transcriber import transcribe_video
+from agents.music import generate_music
 from tools.clip import clip
 from tools.tts import tts
 from tools.cap import build_caption_ass, burn_captions_from_ass, Caption
@@ -97,6 +98,33 @@ captions = [
 ]
 
 caption_ass = build_caption_ass(captions)
-burn_captions_from_ass("final_with_narration.mp4", 'final_output.mp4', caption_ass)
+burn_captions_from_ass("final_with_narration.mp4", 'final_captioned.mp4', caption_ass)
+
+# ── 6. Generate background music and mix in ──────────────────────────────────────
+
+# get video duration via ffprobe
+probe = subprocess.run([
+    "ffprobe", "-v", "error",
+    "-show_entries", "format=duration",
+    "-of", "default=noprint_wrappers=1:nokey=1",
+    "final_captioned.mp4",
+], capture_output=True, text=True, check=True)
+duration = float(probe.stdout.strip())
+
+print(f"Generating {duration:.1f}s of background music...")
+generate_music('Upbeat chill vibes no singing', duration=duration, dst="bg_music.wav")
+
+# mix: narration at full volume, music at -18dB
+subprocess.run([
+    "ffmpeg", "-y",
+    "-i", "final_captioned.mp4",
+    "-i", "bg_music.wav",
+    "-filter_complex", "[1:a]volume=-18dB[music];[0:a][music]amix=inputs=2:duration=first[aout]",
+    "-map", "0:v",
+    "-map", "[aout]",
+    "-c:v", "copy",
+    "-c:a", "aac",
+    "final_output.mp4",
+], check=True, capture_output=True)
 
 print("\nDone → final_output.mp4")
