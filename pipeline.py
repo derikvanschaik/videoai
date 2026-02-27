@@ -4,6 +4,7 @@ import tempfile
 import json
 
 from agents.editor import create_edit_plan
+from agents.transcriber import transcribe_video
 from tools.clip import clip
 from tools.tts import tts
 from tools.cap import build_caption_ass, burn_captions_from_ass, Caption
@@ -48,37 +49,7 @@ with tempfile.TemporaryDirectory() as tmp:
     os.unlink(list_file)
 
 
-# HELPERS FOR CAPTION STEP
-def parse_mm_ss_string_to_seconds(mm_ss: str) -> int:
-    mm, ss = mm_ss.split(":")[0], mm_ss.split(":")[1]
-    mm = int(mm) * 60
-    ss = int(ss)
-    return int(mm + ss)
-
-def seconds_to_mm_ss(seconds: int) -> str:
-      mm = seconds // 60
-      ss = seconds % 60                                                                                              
-      return f"{mm:02d}:{ss:02d}"
-
-
-# Now Add captions after video is clipped together
-captions = []
-time_in_final_video = 0
-for scene in sorted(plan.scenes, key=lambda s: s.index):
-    duration = parse_mm_ss_string_to_seconds(scene.clip_end) - parse_mm_ss_string_to_seconds(scene.clip_start)
-    start = time_in_final_video
-    end   = time_in_final_video + duration
-    time_in_final_video += duration
-    captions.append(Caption(
-        text  = scene.narration,
-        start = seconds_to_mm_ss(start),
-        end   = seconds_to_mm_ss(end),
-    ))
-
-caption_ass = build_caption_ass(captions)
-burn_captions_from_ass(OUTPUT, 'final_output.mp4', caption_ass)
-
-# ── 5. TTS + mix narration ────────────────────────────────────────────────────────
+# ── 4. TTS + mix narration ────────────────────────────────────────────────────────
 
 with tempfile.TemporaryDirectory() as tmp:
     wav_paths = []
@@ -102,10 +73,10 @@ with tempfile.TemporaryDirectory() as tmp:
     ], check=True, capture_output=True)
     os.unlink(wav_list)
 
-# mix narration onto the captioned video
+# mix narration onto the video
 subprocess.run([
     "ffmpeg", "-y",
-    "-i", "final_output.mp4",
+    "-i", OUTPUT,
     "-i", narration_wav,
     "-map", "0:v",
     "-map", "1:a",
@@ -115,4 +86,17 @@ subprocess.run([
     "final_with_narration.mp4",
 ], check=True, capture_output=True)
 
-print("\nDone → final_with_narration.mp4")
+# ── 5. Transcribe narrated video and burn captions ───────────────────────────────
+
+print("Transcribing narration...")
+transcription = transcribe_video("final_with_narration.mp4")
+
+captions = [
+    Caption(text=seg.text, start=seg.start, end=seg.end)
+    for seg in transcription.segments
+]
+
+caption_ass = build_caption_ass(captions)
+burn_captions_from_ass("final_with_narration.mp4", 'final_output.mp4', caption_ass)
+
+print("\nDone → final_output.mp4")
