@@ -39,7 +39,7 @@ def transcribe_video(video_path: str) -> Transcription:
         types.Part(text="""Transcribe every spoken word in this video.
 
 Return a list of segments. Each segment should contain:
-- text:  the spoken word or short natural phrase (a few words that belong together)
+- text:  the spoken word or a few words that make sense together (no more than 4 though)
 - start: timestamp when the word/phrase starts, formatted as MM:SS  (e.g. "00:04")
 - end:   timestamp when the word/phrase ends,   formatted as MM:SS  (e.g. "00:07")
 

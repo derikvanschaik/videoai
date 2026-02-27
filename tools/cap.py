@@ -1,6 +1,6 @@
 import os
 import subprocess
-from typing import NamedTuple, List
+from typing import NamedTuple, List, Callable
 
 
 class Caption(NamedTuple):
@@ -9,28 +9,75 @@ class Caption(NamedTuple):
     end:   str  # MM:SS
 
 
+# ── Timestamp helpers ─────────────────────────────────────────────────────────
+
 def mm_ss_to_ass(ts: str) -> str:
     """Convert MM:SS to ASS timestamp format H:MM:SS.cc"""
+    return _seconds_to_ass(_to_seconds(ts))
+
+def _to_seconds(ts: str) -> float:
     m, s = ts.strip().split(":")
-    total_sec = int(m) * 60 + float(s)
-    h   = int(total_sec // 3600)
-    m   = int((total_sec % 3600) // 60)
-    sec = total_sec % 60
-    return f"{h}:{m:02d}:{sec:05.2f}"
+    return int(m) * 60 + float(s)
+
+def _seconds_to_ass(sec: float) -> str:
+    h   = int(sec // 3600)
+    m   = int((sec % 3600) // 60)
+    s   = sec % 60
+    return f"{h}:{m:02d}:{s:05.2f}"
 
 
-def build_caption_ass(captions: List[Caption]) -> str:
-    """
-    Each caption is displayed as a single line of text centered on screen
-    for the duration of start → end. Dead simple, one Dialogue event per caption.
+# ── Effects ───────────────────────────────────────────────────────────────────
+# Each effect takes a Caption and returns a list of ASS Dialogue lines.
+# Add new effects here — no other code needs to change.
 
-    # TODO: implement word-by-word reveal (the "stacking lines" effect below).
-    # The idea: split narration into chunks, emit one Dialogue event per chunk
-    # where each event shows all chunks up to and including the current one,
-    # creating the effect of words appearing line by line as the narrator speaks.
-    # POSITIONS dict and the _build_lines loop (see git history) are the building
-    # blocks for this — restore them when ready to implement.
-    """
+EffectFn = Callable[[Caption], List[str]]
+
+
+def plain(caption: Caption) -> List[str]:
+    """One line, whole text, no frills."""
+    t0 = _seconds_to_ass(_to_seconds(caption.start))
+    t1 = _seconds_to_ass(_to_seconds(caption.end))
+    return [f"Dialogue: 0,{t0},{t1},Default,,0,0,0,,{caption.text}"]
+
+
+def word_highlight(caption: Caption) -> List[str]:
+    """Karaoke-style: all words visible, current word fills to yellow as it's spoken."""
+    words = caption.text.split()
+    if not words:
+        return plain(caption)
+
+    t0 = _seconds_to_ass(_to_seconds(caption.start))
+    t1 = _seconds_to_ass(_to_seconds(caption.end))
+
+    dur_cs  = int((_to_seconds(caption.end) - _to_seconds(caption.start)) * 100)
+    per_cs  = max(1, dur_cs // len(words))
+
+    # \kf = fill-style karaoke (sweeps colour left-to-right over the word)
+    tagged = "".join(f"{{\\kf{per_cs}}}{w} " for w in words).rstrip()
+    return [f"Dialogue: 0,{t0},{t1},Default,,0,0,0,,{tagged}"]
+
+
+def word_reveal(caption: Caption) -> List[str]:
+    """Each word pops in as its own caption, evenly spaced across start→end."""
+    words = caption.text.split()
+    if not words:
+        return plain(caption)
+
+    start  = _to_seconds(caption.start)
+    end    = _to_seconds(caption.end)
+    step   = (end - start) / len(words)
+
+    lines = []
+    for i, word in enumerate(words):
+        t0 = _seconds_to_ass(start + i * step)
+        t1 = _seconds_to_ass(start + (i + 1) * step)
+        lines.append(f"Dialogue: 0,{t0},{t1},Default,,0,0,0,,{word}")
+    return lines
+
+
+# ── Builder ───────────────────────────────────────────────────────────────────
+
+def build_caption_ass(captions: List[Caption], effect: EffectFn = plain) -> str:
     header = """\
 [Script Info]
 ScriptType: v4.00+
@@ -39,17 +86,15 @@ PlayResY: 1920
 WrapStyle: 0
 
 [V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, Bold, Alignment
-Style: Default,Manrope,60,&H00FFFFFF,1,5
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Alignment, BorderStyle, Outline, Shadow
+Style: Default,Manrope,90,&H00FFFFFF,&H0000FFFF,&H00000000,&H00000000,1,5,1,4,0
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     events = []
     for caption in captions:
-        t0   = mm_ss_to_ass(caption.start)
-        t1   = mm_ss_to_ass(caption.end)
-        events.append(f"Dialogue: 0,{t0},{t1},Default,,0,0,0,,{caption.text}")
+        events.extend(effect(caption))
 
     return header + "\n".join(events) + "\n"
 

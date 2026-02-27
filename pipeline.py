@@ -8,11 +8,11 @@ from agents.transcriber import transcribe_video
 from agents.music import generate_music
 from tools.clip import clip
 from tools.tts import tts
-from tools.cap import build_caption_ass, burn_captions_from_ass, Caption
+from tools.cap import build_caption_ass, burn_captions_from_ass, Caption, word_highlight, word_reveal
 
 ROOT_PATH = '/Users/projectcoordinator/Desktop/videoai/videos'
 OUTPUT    = 'test.mp4'
-QUERY     = '5 simple beginner programming projects'
+QUERY     = 'a concept in Mathematics of Emergent Computation in Distributed Systems explained in 15 seconds'
 
 clips = [os.path.join(ROOT_PATH, f'clip{i}.mp4') for i in range(1, 9)]
 
@@ -112,14 +112,14 @@ probe = subprocess.run([
 duration = float(probe.stdout.strip())
 
 print(f"Generating {duration:.1f}s of background music...")
-generate_music('Upbeat chill vibes no singing', duration=duration, dst="bg_music.wav")
+generate_music('Upbeat motivation background music', duration=duration, dst="bg_music.wav")
 
-# mix: narration at full volume, music at -18dB
+# mix: narration at full volume, music at -8dB
 subprocess.run([
     "ffmpeg", "-y",
     "-i", "final_captioned.mp4",
     "-i", "bg_music.wav",
-    "-filter_complex", "[1:a]volume=-18dB[music];[0:a][music]amix=inputs=2:duration=first[aout]",
+    "-filter_complex", "[1:a]volume=-8dB[music];[0:a][music]amix=inputs=2:duration=first[aout]",
     "-map", "0:v",
     "-map", "[aout]",
     "-c:v", "copy",
