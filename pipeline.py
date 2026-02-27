@@ -12,7 +12,9 @@ from tools.cap import build_caption_ass, burn_captions_from_ass, Caption, word_h
 
 ROOT_PATH = '/Users/projectcoordinator/Desktop/videoai/videos'
 OUTPUT    = 'test.mp4'
-QUERY     = 'a concept in Mathematics of Emergent Computation in Distributed Systems explained in 15 seconds'
+QUERY     = """
+PHD level explanation of greek stoicism in byte sized 15-30 seconds with a point at the end
+"""
 
 clips = [os.path.join(ROOT_PATH, f'clip{i}.mp4') for i in range(1, 9)]
 
@@ -112,7 +114,8 @@ probe = subprocess.run([
 duration = float(probe.stdout.strip())
 
 print(f"Generating {duration:.1f}s of background music...")
-generate_music('Upbeat motivation background music', duration=duration, dst="bg_music.wav")
+print(f"Music style: {plan.music_prompt}")
+generate_music(plan.music_prompt, duration=duration, dst="bg_music.wav")
 
 # mix: narration at full volume, music at -8dB
 subprocess.run([

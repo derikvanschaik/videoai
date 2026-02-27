@@ -26,7 +26,8 @@ class Scene(BaseModel):
     narration:  str  # spoken words for this scene
 
 class EditPlan(BaseModel):
-    scenes: list[Scene]
+    scenes:       list[Scene]
+    music_prompt: str  # background music style description for Lyria
 
 
 # ── Agent ────────────────────────────────────────────────────────────────────────
@@ -52,6 +53,7 @@ Watch the clips and return an edit plan. For each scene pick:
 - narration  — what the voiceover says over this scene
 
 Keep total runtime under 90 seconds.
+Also choose a music_prompt — a short description of the background music style that fits the vibe of the video (e.g. "upbeat lo-fi hip hop", "dark cinematic orchestral", "chill R&B").
 """))
 
     response = client.models.generate_content(
