@@ -2,6 +2,7 @@ import os
 import subprocess
 import tempfile
 import json
+import sys
 
 from agents.editor import create_edit_plan
 from agents.transcriber import transcribe_video
@@ -12,9 +13,9 @@ from tools.cap import build_caption_ass, burn_captions_from_ass, Caption, word_h
 
 ROOT_PATH = '/Users/projectcoordinator/Desktop/videoai/videos'
 OUTPUT    = 'test.mp4'
-QUERY     = """
-PHD level explanation of greek stoicism in byte sized 15-30 seconds with a point at the end
-"""
+
+QUERY = sys.argv[1]
+
 
 clips = [os.path.join(ROOT_PATH, f'clip{i}.mp4') for i in range(1, 9)]
 
